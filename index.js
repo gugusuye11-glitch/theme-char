@@ -383,11 +383,32 @@ jQuery(async () => {
         }
 
         function createSidebarItemLike(sampleEl) {
-            const tag = sampleEl && sampleEl.tagName ? sampleEl.tagName : 'BUTTON';
+            // 针对 inline-drawer 风格：
+            const inlineDrawer = sampleEl && sampleEl.classList && sampleEl.classList.contains('inline-drawer-toggle');
+            if (inlineDrawer) {
+                const el = document.createElement('div');
+                el.id = 'ctb_sidebar_btn';
+                el.className = 'inline-drawer-toggle inline-drawer-header';
+                el.innerHTML = `
+                    <div style="display:flex; align-items:center;">
+                        <b>角色主题绑定</b>
+                    </div>
+                    <div class="inline-drawer-icon fa-solid interactable down up fa-circle-chevron-up" tabindex="0" role="button"></div>
+                `;
+                el.style.cursor = 'pointer';
+                el.addEventListener('click', () => {
+                    const section = document.getElementById('ctb_section');
+                    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    updateStatusUI();
+                    updateModalStatus();
+                });
+                return el;
+            }
+            // 默认按钮风格：
+            const tag = 'BUTTON';
             const el = document.createElement(tag);
             el.id = 'ctb_sidebar_btn';
-            el.className = (sampleEl && sampleEl.className) ? sampleEl.className : 'menu_button';
-            if (!el.className.includes('menu_button')) el.classList.add('menu_button');
+            el.className = 'menu_button';
             el.textContent = '角色主题绑定';
             el.style.cursor = 'pointer';
             el.addEventListener('click', () => {
@@ -415,14 +436,16 @@ jQuery(async () => {
                 return false;
             }
 
-            const parent = chooseInsertParent(sample);
+            // 优先使用 inline-drawer 容器
+            const sampleContainer = sample.closest('.inline-drawer-toggle.inline-drawer-header') || sample;
+            const parent = chooseInsertParent(sampleContainer);
             if (!parent) {
                 console.debug('[Theme Binder] 左栏父容器未确定，稍后重试');
                 return false;
             }
-            const newEl = createSidebarItemLike(sample);
+            const newEl = createSidebarItemLike(sampleContainer);
             try {
-                parent.insertBefore(newEl, sample); // 插到一条已知项之前，更容易被看到
+                parent.insertBefore(newEl, sampleContainer); // 插到一条已知项之前，更容易被看到
                 console.info('[Theme Binder] 已在左栏插入按钮（Observer 模式）');
                 return true;
             } catch (err) {
