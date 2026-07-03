@@ -1,6 +1,29 @@
-import { extension_settings, getContext } from "/scripts/extensions.js";
-import { saveSettingsDebounced } from "/scripts/script.js";
-import { eventSource, event_types } from "/scripts/script.js";
+// 注意：为兼容不同部署路径，这里不再使用 ES Module import。
+// 统一从全局（window）获取 SillyTavern 已加载的对象，以避免 URL 安装后路径解析问题。
+const ST_GLOBALS = {
+    get extension_settings() { return window.extension_settings; },
+    get getContext() { return window.getContext; },
+    get saveSettingsDebounced() { return window.saveSettingsDebounced; },
+    get eventSource() { return window.eventSource; },
+    get event_types() { return window.event_types; },
+};
+
+async function waitForSTGlobals(timeoutMs = 10000) {
+    const start = Date.now();
+    return new Promise((resolve, reject) => {
+        const timer = setInterval(() => {
+            const ok = ST_GLOBALS.extension_settings && ST_GLOBALS.getContext && ST_GLOBALS.saveSettingsDebounced && ST_GLOBALS.eventSource && ST_GLOBALS.event_types && document.getElementById('extensions_settings');
+            if (ok) {
+                clearInterval(timer);
+                resolve(true);
+            } else if (Date.now() - start > timeoutMs) {
+                clearInterval(timer);
+                console.error('[Theme Binder] 等待全局对象超时，扩展可能无法正常工作');
+                resolve(false);
+            }
+        }, 100);
+    });
+}
 
 // 插件的内部名称（保留备用）
 const extensionName = "character-theme-binder";
@@ -8,14 +31,12 @@ const extensionName = "character-theme-binder";
 const settingsPath = "char_theme_binder";
 
 // 初始化设置数据结构
-if (!extension_settings[settingsPath]) {
-    extension_settings[settingsPath] = {};
-}
+// 延迟到初始化时再安全访问 extension_settings
 
 // ========= 基础工具 =========
 // 获取当前角色的唯一标识符 (使用 avatar 文件名最安全，因为名字可能会改)
 function getCurrentCharacterAvatar() {
-    const context = getContext();
+    const context = ST_GLOBALS.getContext && ST_GLOBALS.getContext();
     if (context.characterId !== undefined && context.characters[context.characterId]) {
         return context.characters[context.characterId].avatar;
     }
@@ -25,7 +46,7 @@ function getCurrentCharacterAvatar() {
 function getCurrentBinding() {
     const avatar = getCurrentCharacterAvatar();
     if (!avatar) return null;
-    return extension_settings[settingsPath][avatar] || null;
+    return (ST_GLOBALS.extension_settings && ST_GLOBALS.extension_settings[settingsPath] && ST_GLOBALS.extension_settings[settingsPath][avatar]) || null;
 }
 
 // ========= 设置页状态 =========
@@ -41,6 +62,10 @@ function updateStatusUI() {
     }
 
     const binding = extension_settings[settingsPath][avatar];
+    // 兼容保护
+    if (!binding && ST_GLOBALS.extension_settings && !ST_GLOBALS.extension_settings[settingsPath]) {
+        ST_GLOBALS.extension_settings[settingsPath] = {};
+    }
     if (binding) {
         statusDiv.textContent = `✅ 已绑定 - 背景: ${binding.bg} | 主题: ${binding.theme}`;
         statusDiv.style.color = "#4caf50";
@@ -65,13 +90,13 @@ function bindCurrentSettings() {
     const currentTheme = themeSelect ? themeSelect.value : '';
 
     // 读已有绑定（避免覆盖 image/photo）
-    const existing = extension_settings[settingsPath][avatar] || {};
-    extension_settings[settingsPath][avatar] = {
+    const existing = (ST_GLOBALS.extension_settings[settingsPath] && ST_GLOBALS.extension_settings[settingsPath][avatar]) || {};
+    ST_GLOBALS.extension_settings[settingsPath][avatar] = {
         ...existing,
         bg: currentBg,
         theme: currentTheme,
     };
-    saveSettingsDebounced();
+    ST_GLOBALS.saveSettingsDebounced && ST_GLOBALS.saveSettingsDebounced();
     updateStatusUI();
     toastr.success("角色主题与背景绑定成功！");
 }
@@ -80,9 +105,9 @@ function unbindCurrentSettings() {
     const avatar = getCurrentCharacterAvatar();
     if (!avatar) return;
 
-    if (extension_settings[settingsPath][avatar]) {
-        delete extension_settings[settingsPath][avatar];
-        saveSettingsDebounced();
+    if (ST_GLOBALS.extension_settings[settingsPath] && ST_GLOBALS.extension_settings[settingsPath][avatar]) {
+        delete ST_GLOBALS.extension_settings[settingsPath][avatar];
+        ST_GLOBALS.saveSettingsDebounced && ST_GLOBALS.saveSettingsDebounced();
         updateStatusUI();
         toastr.info("角色主题绑定已解除！");
     }
@@ -92,7 +117,7 @@ function applyBoundSettings() {
     const avatar = getCurrentCharacterAvatar();
     if (!avatar) return;
 
-    const binding = extension_settings[settingsPath][avatar];
+    const binding = ST_GLOBALS.extension_settings[settingsPath] && ST_GLOBALS.extension_settings[settingsPath][avatar];
     if (binding) {
         const bgSelect = document.getElementById('bg_select');
         const themeSelect = document.getElementById('theme_select');
@@ -244,7 +269,7 @@ function saveModalData() {
         return;
     }
 
-    let binding = extension_settings[settingsPath][avatar] || {};
+    let binding = (ST_GLOBALS.extension_settings[settingsPath] && ST_GLOBALS.extension_settings[settingsPath][avatar]) || {};
 
     // 主图来源
     const imgSrcBg = document.getElementById('ctb_image_source_bg');
@@ -277,8 +302,8 @@ function saveModalData() {
 
     binding.image = image;
     binding.photo = photo;
-    extension_settings[settingsPath][avatar] = binding;
-    saveSettingsDebounced();
+    ST_GLOBALS.extension_settings[settingsPath][avatar] = binding;
+    ST_GLOBALS.saveSettingsDebounced && ST_GLOBALS.saveSettingsDebounced();
     toastr.success('已保存图片/照片设置');
     updateModalStatus();
     updateStatusUI();
@@ -286,9 +311,25 @@ function saveModalData() {
 
 // ========= 启动 =========
 jQuery(async () => {
+    console.info('[Theme Binder] 初始化开始');
+    await waitForSTGlobals();
+    if (!ST_GLOBALS.extension_settings) {
+        console.error('[Theme Binder] 未检测到 extension_settings，全局初始化失败');
+        return;
+    }
+    if (!ST_GLOBALS.extension_settings[settingsPath]) {
+        ST_GLOBALS.extension_settings[settingsPath] = {};
+    }
+
     // 加载并注入设置页 HTML
-    const html = await $.get(`${getContext().extensionFolderPath}/index.html`);
-    $("#extensions_settings").append(html);
+    const folder = (ST_GLOBALS.getContext && ST_GLOBALS.getContext().extensionFolderPath) || '';
+    try {
+        const html = await $.get(`${folder}/index.html`);
+        $("#extensions_settings").append(html);
+    } catch (e) {
+        console.error('[Theme Binder] 载入 index.html 失败', e);
+        return;
+    }
 
     // --- 在左侧扩展菜单中注入一个“角色主题绑定”按钮（若能找到容器） ---
     try {
