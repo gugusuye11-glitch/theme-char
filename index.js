@@ -1,5 +1,6 @@
 // 注意：为兼容不同部署路径，这里不再使用 ES Module import。
 // 统一从全局（window）获取 SillyTavern 已加载的对象，以避免 URL 安装后路径解析问题。
+console.info('[Theme Binder] script loaded');
 const ST_GLOBALS = {
     get extension_settings() { return window.extension_settings; },
     get getContext() { return window.getContext; },
@@ -310,7 +311,10 @@ function saveModalData() {
 }
 
 // ========= 启动 =========
-jQuery(async () => {
+let ctb_initialized = false;
+async function initThemeBinder() {
+    if (ctb_initialized) return;
+    ctb_initialized = true;
     console.info('[Theme Binder] 初始化开始');
     await waitForSTGlobals();
     if (!ST_GLOBALS.extension_settings) {
@@ -622,4 +626,27 @@ jQuery(async () => {
     // 初始化状态
     updateStatusUI();
     updateModalStatus();
-});
+}
+
+// 优先通过 SillyTavern 的扩展注册钩子触发
+try {
+    if (typeof window.registerExtension === 'function') {
+        window.registerExtension('character-theme-binder', {
+            async init() {
+                await initThemeBinder();
+            },
+        });
+        console.info('[Theme Binder] registerExtension hook registered');
+    } else {
+        // 退化为 DOM ready 触发
+        jQuery(async () => {
+            await initThemeBinder();
+        });
+        console.info('[Theme Binder] registerExtension not found; using DOM ready init');
+    }
+} catch (e) {
+    console.error('[Theme Binder] 注册初始化钩子失败，将尝试 DOM ready', e);
+    jQuery(async () => {
+        await initThemeBinder();
+    });
+}
