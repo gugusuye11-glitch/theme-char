@@ -2,84 +2,74 @@ import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced } from "../../../../script.js";
 import { eventSource, event_types } from "../../../../script.js";
 
-// 插件的内部名称
-const extensionName = "character-theme-binder";
-// 存储绑定数据的路径
 const settingsPath = "char_theme_binder";
 
-// 初始化设置数据结构
+// 初始化设置数据
 if (!extension_settings[settingsPath]) {
     extension_settings[settingsPath] = {};
 }
 
-// 获取当前角色的唯一标识符 (使用 avatar 文件名最安全，因为名字可能会改)
+// 获取当前角色的头像文件名（作为唯一ID）
 function getCurrentCharacterAvatar() {
     const context = getContext();
     if (context.characterId !== undefined && context.characters[context.characterId]) {
         return context.characters[context.characterId].avatar;
     }
-    return null; // 群聊或者没选角色时返回null
+    return null;
 }
 
-// 更新UI状态显示
-function updateStatusUI() {
-    const statusDiv = document.getElementById('ctb_current_status');
-    if (!statusDiv) return;
+// 获取当前角色名字
+function getCurrentCharacterName() {
+    const context = getContext();
+    if (context.characterId !== undefined && context.characters[context.characterId]) {
+        return context.characters[context.characterId].name;
+    }
+    return null;
+}
 
+// 刷新下拉菜单选项（从酒馆原生菜单里克隆过来）
+function populateDropdowns() {
+    $('#ctb_bg_select').empty();
+    $('#ctb_theme_select').empty();
+    $('#bg_select option').clone().appendTo('#ctb_bg_select');
+    $('#theme_select option').clone().appendTo('#ctb_theme_select');
+}
+
+// 更新扩展面板中的 UI 显示
+function updateExtensionUI() {
+    populateDropdowns();
+    
     const avatar = getCurrentCharacterAvatar();
+    const charName = getCurrentCharacterName();
+    const charNameDiv = document.getElementById('ctb_char_name');
+    const statusDiv = document.getElementById('ctb_current_status');
+    
     if (!avatar) {
-        statusDiv.textContent = "请先打开一个角色的聊天框";
+        charNameDiv.textContent = "当前未打开任何角色";
+        statusDiv.textContent = "当前状态：请先点击一个角色";
         statusDiv.style.color = "yellow";
         return;
     }
 
+    charNameDiv.textContent = `当前选中角色: ${charName}`;
+
     const binding = extension_settings[settingsPath][avatar];
     if (binding) {
-        statusDiv.textContent = `✅ 已绑定 - 背景: ${binding.bg} | 主题: ${binding.theme}`;
+        // 如果有绑定记录，下拉框显示绑定的值
+        $('#ctb_bg_select').val(binding.bg);
+        $('#ctb_theme_select').val(binding.theme);
+        statusDiv.textContent = "当前状态：✅ 已绑定专属主题";
         statusDiv.style.color = "#4caf50";
     } else {
-        statusDiv.textContent = "❌ 当前角色未绑定";
+        // 如果没有绑定，下拉框显示酒馆当前正在使用的值
+        $('#ctb_bg_select').val($('#bg_select').val());
+        $('#ctb_theme_select').val($('#theme_select').val());
+        statusDiv.textContent = "当前状态：❌ 未绑定";
         statusDiv.style.color = "gray";
     }
 }
 
-// 绑定操作
-function bindCurrentSettings() {
-    const avatar = getCurrentCharacterAvatar();
-    if (!avatar) {
-        toastr.warning("请先打开一个角色的聊天框！");
-        return;
-    }
-
-    // 获取酒馆当前选中的背景和主题
-    const currentBg = document.getElementById('bg_select').value;
-    const currentTheme = document.getElementById('theme_select').value;
-
-    // 保存到扩展设置中
-    extension_settings[settingsPath][avatar] = {
-        bg: currentBg,
-        theme: currentTheme
-    };
-    saveSettingsDebounced();
-    
-    updateStatusUI();
-    toastr.success("角色主题与背景绑定成功！");
-}
-
-// 解除绑定操作
-function unbindCurrentSettings() {
-    const avatar = getCurrentCharacterAvatar();
-    if (!avatar) return;
-
-    if (extension_settings[settingsPath][avatar]) {
-        delete extension_settings[settingsPath][avatar];
-        saveSettingsDebounced();
-        updateStatusUI();
-        toastr.info("角色主题绑定已解除！");
-    }
-}
-
-// 应用绑定好的主题和背景
+// 应用绑定好的主题和背景（切换聊天时触发）
 function applyBoundSettings() {
     const avatar = getCurrentCharacterAvatar();
     if (!avatar) return;
@@ -89,46 +79,73 @@ function applyBoundSettings() {
         const bgSelect = document.getElementById('bg_select');
         const themeSelect = document.getElementById('theme_select');
 
-        let changed = false;
-
-        // 如果绑定的背景存在，并且和当前的背景不一样
+        // 如果背景不同，则切换背景
         if (binding.bg && bgSelect.value !== binding.bg) {
             bgSelect.value = binding.bg;
-            // 触发酒馆原生的 change 事件，让酒馆自己去加载背景图片
             bgSelect.dispatchEvent(new Event('change', { bubbles: true })); 
-            changed = true;
         }
 
-        // 如果绑定的主题存在，并且和当前的不一样
+        // 如果主题不同，则切换主题
         if (binding.theme && themeSelect.value !== binding.theme) {
             themeSelect.value = binding.theme;
-            // 触发酒馆原生的 change 事件，让酒馆自己去加载CSS主题
             themeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            changed = true;
-        }
-
-        if (changed) {
-            console.log(`[Theme Binder] 已自动切换为 ${avatar} 的专属背景和主题`);
         }
     }
-    updateStatusUI();
 }
 
-// 插件入口函数
+// 初始化加载
 jQuery(async () => {
-    // 1. 加载 HTML UI
-    const html = await $.get(`${getContext().extensionFolderPath}/index.html`);
+    // 获取当前扩展文件夹的路径并加载 HTML
+    const extensionPath = getContext().extensionFolderPath;
+    const html = await $.get(`${extensionPath}/index.html`);
+    
+    // 将界面添加到酒馆扩展面板的左侧列表中
     $("#extensions_settings").append(html);
 
-    // 2. 绑定按钮点击事件
-    document.getElementById('ctb_bind_btn').addEventListener('click', bindCurrentSettings);
-    document.getElementById('ctb_unbind_btn').addEventListener('click', unbindCurrentSettings);
-
-    // 3. 监听聊天切换事件 (当点开一个角色时触发)
-    eventSource.on(event_types.CHAT_CHANGED, () => {
+    // 绑定【保存】按钮事件
+    $('#ctb_save_btn').on('click', () => {
+        const avatar = getCurrentCharacterAvatar();
+        if (!avatar) {
+            toastr.warning("请先在主界面点开一个角色的聊天框！");
+            return;
+        }
+        
+        // 记录在插件下拉框中选中的值
+        extension_settings[settingsPath][avatar] = {
+            bg: $('#ctb_bg_select').val(),
+            theme: $('#ctb_theme_select').val()
+        };
+        saveSettingsDebounced();
+        
+        // 立即应用并刷新 UI
         applyBoundSettings();
+        updateExtensionUI();
+        toastr.success(`已成功为角色绑定专属主题！`);
     });
 
-    // 4. 初始化UI状态
-    updateStatusUI();
+    // 绑定【解除绑定】按钮事件
+    $('#ctb_unbind_btn').on('click', () => {
+        const avatar = getCurrentCharacterAvatar();
+        if (!avatar) return;
+
+        if (extension_settings[settingsPath][avatar]) {
+            delete extension_settings[settingsPath][avatar];
+            saveSettingsDebounced();
+            updateExtensionUI();
+            toastr.info("角色主题绑定已解除！");
+        }
+    });
+
+    // 监听：当用户在面板点击折叠菜单时，刷新一次下拉框，防止有新图片加入
+    $(document).on('click', '.inline-drawer-toggle', function() {
+        if ($(this).find('b').text() === '角色主题绑定') {
+            updateExtensionUI();
+        }
+    });
+
+    // 监听：当点开一个角色的聊天框时
+    eventSource.on(event_types.CHAT_CHANGED, () => {
+        applyBoundSettings();
+        updateExtensionUI();
+    });
 });
