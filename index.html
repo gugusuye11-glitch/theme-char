@@ -1,0 +1,100 @@
+<div class="extension_settings_container">
+    <div class="settings-divider"></div>
+    <h3 title="绑定当前角色的背景和主题">角色主题绑定器 (Theme Binder)</h3>
+    
+    <div class="flex-container">
+        <label>
+            1. 请先在酒馆设置中切换好你想要的【背景】和【UI主题】。<br>
+            2. 打开你想绑定的【角色】聊天界面。<br>
+            3. 点击下方按钮进行绑定。
+        </label>
+    </div>
+
+    <div class="flex-container" style="margin-top: 10px;">
+        <div id="ctb_current_status" style="color: #4caf50; font-weight: bold; margin-bottom: 10px;">
+            当前角色未绑定
+        </div>
+        <button id="ctb_bind_btn" class="menu_button">🔗 绑定当前背景/主题到当前角色</button>
+        <button id="ctb_unbind_btn" class="menu_button" style="margin-top: 5px;">❌ 解除当前角色的绑定</button>
+    </div>
+
+    <div class="settings-divider" style="margin: 12px 0;"></div>
+    <div class="flex-container" style="align-items: center; gap: 8px;">
+        <span style="font-weight: 600;">快速操作：</span>
+        <button id="ctb_open_modal_btn" class="menu_button">角色主题绑定</button>
+    </div>
+</div>
+
+<!-- 弹窗（Modal） -->
+<style>
+  .ctb-modal { position: fixed; inset: 0; display: none; z-index: 9999; }
+  .ctb-modal.show { display: block; }
+  .ctb-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
+  .ctb-modal-content {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    background: var(--SmartThemeBodyColor, #2b2b2b); color: var(--SmartThemeTextColor, #eee);
+    width: min(680px, 92vw); max-height: 80vh; overflow: auto; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    padding: 16px 16px 12px 16px; border: 1px solid rgba(255,255,255,0.08);
+  }
+  .ctb-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .ctb-modal-title { font-size: 16px; font-weight: 700; }
+  .ctb-close-btn { cursor: pointer; border: none; background: transparent; color: inherit; font-size: 20px; line-height: 1; }
+  .ctb-section { margin: 10px 0 14px; padding: 10px; border: 1px dashed rgba(255,255,255,0.15); border-radius: 8px; }
+  .ctb-section legend, .ctb-section-title { font-weight: 600; margin-bottom: 6px; }
+  .ctb-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .ctb-preview-wrap { margin-top: 6px; }
+  .ctb-preview { max-width: 100%; max-height: 180px; border-radius: 6px; display:none; }
+  .ctb-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+  .ctb-small { font-size: 12px; padding: 4px 8px; }
+</style>
+
+<div id="ctb_modal" class="ctb-modal" aria-hidden="true">
+  <div class="ctb-modal-backdrop" id="ctb_modal_backdrop"></div>
+  <div class="ctb-modal-content" role="dialog" aria-modal="true" aria-labelledby="ctb_modal_title">
+    <div class="ctb-modal-header">
+      <div class="ctb-modal-title" id="ctb_modal_title">角色主题绑定</div>
+      <button class="ctb-close-btn" id="ctb_modal_close_btn" title="关闭">×</button>
+    </div>
+
+    <div id="ctb_modal_status" style="margin-bottom: 8px; color: #a0ffa0; font-weight: 600;">请先打开一个角色的聊天框</div>
+
+    <div class="ctb-section">
+      <div class="ctb-section-title">背景 / 主题</div>
+      <div class="ctb-row">
+        <button id="ctb_modal_bind_btn" class="menu_button">🔗 绑定当前背景/主题</button>
+        <button id="ctb_modal_unbind_btn" class="menu_button">❌ 解除当前角色的绑定</button>
+      </div>
+    </div>
+
+    <div class="ctb-section">
+      <div class="ctb-section-title">图片设置（主图）</div>
+      <div class="ctb-row">
+        <label><input type="radio" name="ctb_image_source" id="ctb_image_source_bg" value="bg"> 使用当前背景选择</label>
+        <label><input type="radio" name="ctb_image_source" id="ctb_image_source_upload" value="upload"> 本地上传</label>
+        <input type="file" id="ctb_image_file" accept="image/*" style="display:none;">
+        <button id="ctb_image_clear" class="menu_button ctb-small" style="display:none;">清除图片</button>
+      </div>
+      <div class="ctb-preview-wrap">
+        <img id="ctb_image_preview" class="ctb-preview" alt="图片预览">
+      </div>
+    </div>
+
+    <div class="ctb-section">
+      <div class="ctb-section-title">照片设置</div>
+      <div class="ctb-row">
+        <label style="opacity:0.8;">仅支持本地上传</label>
+        <input type="file" id="ctb_photo_file" accept="image/*">
+        <button id="ctb_photo_clear" class="menu_button ctb-small" style="display:none;">清除照片</button>
+      </div>
+      <div class="ctb-preview-wrap">
+        <img id="ctb_photo_preview" class="ctb-preview" alt="照片预览">
+      </div>
+    </div>
+
+    <div class="ctb-actions">
+      <button id="ctb_modal_save" class="menu_button">保存</button>
+      <button id="ctb_modal_close" class="menu_button">关闭</button>
+    </div>
+  </div>
+  
+</div>
