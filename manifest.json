@@ -4,8 +4,9 @@
     "version": "1.1.0",
     "author": "Your Name",
     "description": "为特定角色绑定特定的背景图片、照片与 UI 主题，切换角色时自动应用。",
-    "entrypoint": "index.js",
+    "entrypoint": "./index.js",
     "files": ["index.js", "index.html", "manifest.json"],
-    "requirements": [],
+    "requires": [],
+    "loading_order": 50,
     "tags": ["UI", "Theme", "Convenience"]
 }
