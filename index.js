@@ -2,6 +2,8 @@ import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced } from "../../../../script.js";
 import { eventSource, event_types } from "../../../../script.js";
 
+// 这里写死你的仓库名称，保证任何版本的酒馆都能找到文件
+const extensionName = "theme-char"; 
 const settingsPath = "char_theme_binder";
 
 // 初始化设置数据
@@ -45,27 +47,33 @@ function updateExtensionUI() {
     const statusDiv = document.getElementById('ctb_current_status');
     
     if (!avatar) {
-        charNameDiv.textContent = "当前未打开任何角色";
-        statusDiv.textContent = "当前状态：请先点击一个角色";
-        statusDiv.style.color = "yellow";
+        if(charNameDiv) charNameDiv.textContent = "当前未打开任何角色";
+        if(statusDiv) {
+            statusDiv.textContent = "当前状态：请先点击一个角色";
+            statusDiv.style.color = "yellow";
+        }
         return;
     }
 
-    charNameDiv.textContent = `当前选中角色: ${charName}`;
+    if(charNameDiv) charNameDiv.textContent = `当前选中角色: ${charName}`;
 
     const binding = extension_settings[settingsPath][avatar];
     if (binding) {
         // 如果有绑定记录，下拉框显示绑定的值
         $('#ctb_bg_select').val(binding.bg);
         $('#ctb_theme_select').val(binding.theme);
-        statusDiv.textContent = "当前状态：✅ 已绑定专属主题";
-        statusDiv.style.color = "#4caf50";
+        if(statusDiv) {
+            statusDiv.textContent = "当前状态：✅ 已绑定专属主题";
+            statusDiv.style.color = "#4caf50";
+        }
     } else {
         // 如果没有绑定，下拉框显示酒馆当前正在使用的值
         $('#ctb_bg_select').val($('#bg_select').val());
         $('#ctb_theme_select').val($('#theme_select').val());
-        statusDiv.textContent = "当前状态：❌ 未绑定";
-        statusDiv.style.color = "gray";
+        if(statusDiv) {
+            statusDiv.textContent = "当前状态：❌ 未绑定";
+            statusDiv.style.color = "gray";
+        }
     }
 }
 
@@ -95,12 +103,17 @@ function applyBoundSettings() {
 
 // 初始化加载
 jQuery(async () => {
-    // 获取当前扩展文件夹的路径并加载 HTML
-    const extensionPath = getContext().extensionFolderPath;
-    const html = await $.get(`${extensionPath}/index.html`);
+    // 兼容所有酒馆版本的绝对路径写法
+    const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
     
-    // 将界面添加到酒馆扩展面板的左侧列表中
-    $("#extensions_settings").append(html);
+    try {
+        const html = await $.get(`${extensionFolderPath}/index.html`);
+        // 将界面添加到酒馆扩展面板的左侧列表中
+        $("#extensions_settings").append(html);
+    } catch (error) {
+        console.error("[Theme Binder] 界面加载失败，请检查路径:", error);
+        return;
+    }
 
     // 绑定【保存】按钮事件
     $('#ctb_save_btn').on('click', () => {
@@ -136,7 +149,7 @@ jQuery(async () => {
         }
     });
 
-    // 监听：当用户在面板点击折叠菜单时，刷新一次下拉框，防止有新图片加入
+    // 监听：当用户在面板点击折叠菜单时，刷新一次下拉框
     $(document).on('click', '.inline-drawer-toggle', function() {
         if ($(this).find('b').text() === '角色主题绑定') {
             updateExtensionUI();
