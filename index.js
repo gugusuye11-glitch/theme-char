@@ -354,6 +354,92 @@ jQuery(async () => {
         console.warn('[Theme Binder] 侧栏按钮注入失败（非致命）', e);
     }
 
+    // --- 使用 MutationObserver 更稳健地往左栏插入按钮（克隆样式） ---
+    (function setupLeftMenuObserver() {
+        const scope = document.body; // 作用域扩大到 body，以适配不同主题将左栏渲染在外部容器
+        if (!scope) return;
+
+        let lastTry = 0;
+        const candidateTexts = [
+            '酒馆助手','提示词模板','快速回复','QR助手','聊天翻译','图片描述','总结','正则','向量存储',
+            '角色表情','图像生成','扩展程序'
+        ];
+
+        function findElementByTextFuzzy(container, text) {
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT, null);
+            while (walker.nextNode()) {
+                const el = walker.currentNode;
+                if (!el) continue;
+                const t = (el.textContent || '').trim();
+                if (t && t.includes(text)) return el;
+            }
+            return null;
+        }
+
+        function chooseInsertParent(fromEl) {
+            if (!fromEl) return null;
+            const parent = fromEl.closest('ul,ol,nav,section,div');
+            return parent || fromEl.parentElement;
+        }
+
+        function createSidebarItemLike(sampleEl) {
+            const tag = sampleEl && sampleEl.tagName ? sampleEl.tagName : 'BUTTON';
+            const el = document.createElement(tag);
+            el.id = 'ctb_sidebar_btn';
+            el.className = (sampleEl && sampleEl.className) ? sampleEl.className : 'menu_button';
+            if (!el.className.includes('menu_button')) el.classList.add('menu_button');
+            el.textContent = '角色主题绑定';
+            el.style.cursor = 'pointer';
+            el.addEventListener('click', () => {
+                const section = document.getElementById('ctb_section');
+                if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                updateStatusUI();
+                updateModalStatus();
+            });
+            return el;
+        }
+
+        function tryInsert() {
+            if (document.getElementById('ctb_sidebar_btn')) return true; // 已存在
+            const now = Date.now();
+            if (now - lastTry < 500) return false; // 节流
+            lastTry = now;
+
+            let sample = null;
+            for (const txt of candidateTexts) {
+                sample = findElementByTextFuzzy(scope, txt);
+                if (sample) break;
+            }
+            if (!sample) {
+                console.debug('[Theme Binder] 左栏样本项未找到，等待渲染…');
+                return false;
+            }
+
+            const parent = chooseInsertParent(sample);
+            if (!parent) {
+                console.debug('[Theme Binder] 左栏父容器未确定，稍后重试');
+                return false;
+            }
+            const newEl = createSidebarItemLike(sample);
+            try {
+                parent.insertBefore(newEl, sample); // 插到一条已知项之前，更容易被看到
+                console.info('[Theme Binder] 已在左栏插入按钮（Observer 模式）');
+                return true;
+            } catch (err) {
+                console.warn('[Theme Binder] 左栏插入失败，将继续观察', err);
+                return false;
+            }
+        }
+
+        // 先尝试一次
+        if (!tryInsert()) {
+            const mo = new MutationObserver(() => {
+                if (tryInsert()) mo.disconnect();
+            });
+            mo.observe(scope, { childList: true, subtree: true });
+        }
+    })();
+
     // 设置页按钮事件
     const bindBtn = document.getElementById('ctb_bind_btn');
     const unbindBtn = document.getElementById('ctb_unbind_btn');
