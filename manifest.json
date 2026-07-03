@@ -1,0 +1,8 @@
+{
+    "display_name": "角色主题绑定器",
+    "name": "theme-char",
+    "version": "1.0.0",
+    "author": "Your Name",
+    "description": "为特定角色绑定特定的背景图片和UI主题。",
+    "requirements": []
+}
