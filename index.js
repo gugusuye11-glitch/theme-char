@@ -1,6 +1,6 @@
-import { extension_settings, getContext } from "../../../extensions.js";
-import { saveSettingsDebounced } from "../../../../script.js";
-import { eventSource, event_types } from "../../../../script.js";
+import { extension_settings, getContext } from "/scripts/extensions.js";
+import { saveSettingsDebounced } from "/scripts/script.js";
+import { eventSource, event_types } from "/scripts/script.js";
 
 // 插件的内部名称（保留备用）
 const extensionName = "character-theme-binder";
@@ -289,6 +289,70 @@ jQuery(async () => {
     // 加载并注入设置页 HTML
     const html = await $.get(`${getContext().extensionFolderPath}/index.html`);
     $("#extensions_settings").append(html);
+
+    // --- 在左侧扩展菜单中注入一个“角色主题绑定”按钮（若能找到容器） ---
+    try {
+        const sidebarSelectors = [
+            '#extensions-settings-button',
+            '#extensions-settings-buttons',
+            '#extensions_settings_button',
+            '#extensions_settings_buttons',
+            '.extensions-settings-button',
+            '.extensions-settings-buttons',
+            '#extensions_left',
+            '.extensions__left',
+        ];
+        let sidebar = null;
+        for (const sel of sidebarSelectors) {
+            const el = document.querySelector(sel);
+            if (el) { sidebar = el; break; }
+        }
+        const ensureSidebarItem = () => {
+            if (document.getElementById('ctb_sidebar_btn')) return; // 已存在
+            if (sidebar) {
+                const btn = document.createElement('button');
+                btn.id = 'ctb_sidebar_btn';
+                btn.className = 'menu_button';
+                btn.textContent = '角色主题绑定';
+                btn.style.width = '100%';
+                btn.style.margin = '4px 0';
+                btn.addEventListener('click', () => {
+                    const section = document.getElementById('ctb_section');
+                    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    updateStatusUI();
+                    updateModalStatus();
+                });
+                sidebar.appendChild(btn);
+            } else {
+                // 找不到左侧容器：在扩展设置上方放置一个粘性按钮作为降级方案
+                if (!document.getElementById('ctb_sidebar_fallback')) {
+                    const host = document.getElementById('extensions_settings');
+                    const fallback = document.createElement('div');
+                    fallback.id = 'ctb_sidebar_fallback';
+                    fallback.style.position = 'sticky';
+                    fallback.style.top = '6px';
+                    fallback.style.zIndex = '2';
+                    fallback.style.marginBottom = '6px';
+                    const btn2 = document.createElement('button');
+                    btn2.className = 'menu_button';
+                    btn2.textContent = '角色主题绑定';
+                    btn2.addEventListener('click', () => {
+                        const section = document.getElementById('ctb_section');
+                        if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        updateStatusUI();
+                        updateModalStatus();
+                    });
+                    fallback.appendChild(btn2);
+                    if (host) host.prepend(fallback);
+                }
+            }
+        };
+        ensureSidebarItem();
+        // 某些主题会延迟渲染侧栏，延迟重试一次
+        setTimeout(ensureSidebarItem, 800);
+    } catch (e) {
+        console.warn('[Theme Binder] 侧栏按钮注入失败（非致命）', e);
+    }
 
     // 设置页按钮事件
     const bindBtn = document.getElementById('ctb_bind_btn');
