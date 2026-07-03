@@ -1,20 +1,24 @@
-<div class="extension_settings_container">
-    <div class="settings-divider"></div>
-    <h3 title="绑定当前角色的背景和主题">角色主题绑定器 (Theme Binder)</h3>
-    
-    <div class="flex-container">
-        <label>
-            1. 请先在酒馆设置中切换好你想要的【背景】和【UI主题】。<br>
-            2. 打开你想绑定的【角色】聊天界面。<br>
-            3. 点击下方按钮进行绑定。
-        </label>
+<div class="inline-drawer">
+    <div class="inline-drawer-toggle inline-drawer-header">
+        <b>角色主题绑定</b>
+        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
     </div>
+    <div class="inline-drawer-content" style="display: none; padding: 10px;">
+        
+        <div id="ctb_char_name" style="font-weight: bold; margin-bottom: 10px; color: var(--SmartThemeBodyColor);">当前未打开任何角色</div>
+        
+        <label for="ctb_bg_select">选择绑定的背景:</label>
+        <select id="ctb_bg_select" class="text_pole" style="width: 100%; margin-bottom: 10px;"></select>
 
-    <div class="flex-container" style="margin-top: 10px;">
-        <div id="ctb_current_status" style="color: #4caf50; font-weight: bold; margin-bottom: 10px;">
-            当前角色未绑定
+        <label for="ctb_theme_select">选择绑定的主题:</label>
+        <select id="ctb_theme_select" class="text_pole" style="width: 100%; margin-bottom: 15px;"></select>
+
+        <div id="ctb_current_status" style="color: gray; margin-bottom: 10px; font-size: 0.9em;">
+            当前状态：未绑定
         </div>
-        <button id="ctb_bind_btn" class="menu_button">🔗 绑定当前背景/主题到当前角色</button>
-        <button id="ctb_unbind_btn" class="menu_button" style="margin-top: 5px;">❌ 解除当前角色的绑定</button>
+
+        <button id="ctb_save_btn" class="menu_button">💾 保存/覆盖绑定</button>
+        <button id="ctb_unbind_btn" class="menu_button" style="margin-top: 5px;">❌ 解除绑定</button>
+        
     </div>
 </div>
